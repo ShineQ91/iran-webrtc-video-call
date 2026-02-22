@@ -12,18 +12,18 @@ class IranVideoCall {
         this.isAudioEnabled = true;
         this.isScreenSharing = false;
         
-        // تنظیمات بهینه برای اینترنت ضعیف
+        // تنظیمات بهینه برای اینترنت ضعیف - کیفیت بهبود یافته
         this.mediaConstraints = {
             video: {
-                width: { ideal: 320, max: 640 },
-                height: { ideal: 240, max: 480 },
-                frameRate: { ideal: 15, max: 20 }
+                width: { ideal: 1280, max: 1920 },
+                height: { ideal: 720, max: 1080 },
+                frameRate: { ideal: 30, max: 60 }
             },
             audio: {
                 echoCancellation: true,
                 noiseSuppression: true,
                 autoGainControl: true,
-                sampleRate: 16000
+                sampleRate: 48000
             }
         };
         
@@ -211,8 +211,8 @@ class IranVideoCall {
             document.getElementById('startCallSection').classList.add('hidden');
             document.getElementById('callSection').classList.remove('hidden');
             
-            // بهینه‌سازی کیفیت برای اینترنت ضعیف
-            this.optimizeForLowBandwidth();
+            // بهینه‌سازی کیفیت برای کیفیت بالا
+            this.optimizeForHighBandwidth();
             
             // شروع مانیتورینگ کیفیت
             this.startQualityMonitoring();
@@ -508,10 +508,10 @@ class IranVideoCall {
         return null;
     }
     
-    // بهینه‌سازی برای پهنای باند کم
-    optimizeForLowBandwidth() {
+    // بهینه‌سازی برای کیفیت بالا
+    optimizeForHighBandwidth() {
         Object.values(this.peerConnections).forEach(pc => {
-            // تنظیمات کدک برای پهنای باند کم
+            // تنظیمات کدک برای کیفیت بالا
             const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
             if (sender) {
                 const parameters = sender.getParameters();
@@ -520,11 +520,11 @@ class IranVideoCall {
                     parameters.encodings = [{}];
                 }
                 
-                // محدود کردن بیت‌ریت
-                parameters.encodings[0].maxBitrate = 200000; // 200 kbps
+                // افزایش بیت‌ریت برای کیفیت بالا
+                parameters.encodings[0].maxBitrate = 2000000; // 2 Mbps
                 
-                // کاهش رزولوشن و فریم‌ریت
-                parameters.encodings[0].scaleResolutionDownBy = 2;
+                // حذف کاهش رزولوشن
+                parameters.encodings[0].scaleResolutionDownBy = 1;
                 
                 sender.setParameters(parameters).catch(console.error);
             }
@@ -580,7 +580,7 @@ class IranVideoCall {
         }
     }
     
-    // تنظیم تطبیقی کیفیت
+    // تنظیم تطبیقی کیفیت - بهبود یافته
     adaptiveQuality(userId, bitrate, packetsLost) {
         const pc = this.peerConnections[userId];
         if (!pc) return;
@@ -592,14 +592,18 @@ class IranVideoCall {
         if (!parameters.encodings) return;
         
         // اگر بیت‌ریت خیلی کم است یا پکت لاس زیاد است
-        if (bitrate < 100000 || packetsLost > 10) {
+        if (bitrate < 500000 || packetsLost > 10) {
             // کاهش کیفیت
-            parameters.encodings[0].scaleResolutionDownBy = 4;
-            parameters.encodings[0].maxBitrate = 100000;
-        } else if (bitrate > 300000 && packetsLost < 3) {
+            parameters.encodings[0].scaleResolutionDownBy = 2;
+            parameters.encodings[0].maxBitrate = 500000;
+        } else if (bitrate > 1500000 && packetsLost < 3) {
             // افزایش کیفیت
             parameters.encodings[0].scaleResolutionDownBy = 1;
-            parameters.encodings[0].maxBitrate = 400000;
+            parameters.encodings[0].maxBitrate = 2500000;
+        } else {
+            // کیفیت متوسط
+            parameters.encodings[0].scaleResolutionDownBy = 1.5;
+            parameters.encodings[0].maxBitrate = 1500000;
         }
         
         sender.setParameters(parameters).catch(console.error);
@@ -611,7 +615,12 @@ class IranVideoCall {
         const bandwidthElement = document.getElementById('bandwidthInfo');
         
         if (bitrate > 0) {
-            qualityElement.textContent = `کیفیت: ${bitrate > 200000 ? 'خوب' : bitrate > 100000 ? 'متوسط' : 'ضعیف'}`;
+            let quality = 'ضعیف';
+            if (bitrate > 2000000) quality = 'عالی';
+            else if (bitrate > 1500000) quality = 'خوب';
+            else if (bitrate > 800000) quality = 'متوسط';
+            
+            qualityElement.textContent = `کیفیت: ${quality}`;
             bandwidthElement.textContent = `پهنای باند: ${Math.round(bitrate / 1000)} kbps`;
         }
         
