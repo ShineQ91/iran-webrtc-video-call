@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>اتاق ویدیویی ایران - تماس گروهی رایگان</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2563eb">
+    
+    <!-- آیکون‌های PWA -->
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="icon-16.png">
+    
+    <!-- Tailwind CSS برای استایل‌دهی سریع -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome برای آیکون‌ها -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* استایل‌های سفارشی برای بهینه‌سازی موبایل */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow-x: hidden;
+        }
+        
+        .video-container {
+            position: relative;
+            background: #1a1a1a;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .video-element {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .video-overlay {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        
+        .control-button {
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        }
+        
+        .control-button:hover {
+            transform: scale(1.05);
+        }
+        
+        .control-button.active {
+            background: #10b981 !important;
+        }
+        
+        .chat-container {
+            max-height: 200px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+        }
+        
+        .chat-message {
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-connected {
+            background: #10b981;
+            color: white;
+        }
+        
+        .status-connecting {
+            background: #f59e0b;
+            color: white;
+        }
+        
+        .status-disconnected {
+            background: #ef4444;
+            color: white;
+        }
+        
+        /* بهینه‌سازی برای موبایل */
+        @media (max-width: 768px) {
+            .video-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .control-panel {
+                flex-direction: column;
+                gap: 8px;
+            }
+        }
+        
+        /* حالت تمام صفحه برای ویدیو */
+        .fullscreen-video {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 9999 !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <!-- وضعیت اتصال -->
+    <div id="connectionStatus" class="connection-status status-connecting">
+        <i class="fas fa-circle"></i> در حال اتصال...
+    </div>
+
+    <!-- هدر -->
+    <header class="bg-blue-600 p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-video text-2xl"></i>
+                <div>
+                    <h1 class="text-xl font-bold">اتاق ویدیویی ایران</h1>
+                    <p class="text-xs opacity-90">تماس گروهی رایگان - بهینه برای اینترنت ضعیف</p>
+                </div>
+            </div>
+            <div class="text-sm">
+                <span id="userCount">0</span> کاربر آنلاین
+            </div>
+        </div>
+    </header>
+
+    <!-- محتوای اصلی -->
+    <main class="container mx-auto p-4">
+        <!-- دکمه شروع تماس -->
+        <div id="startCallSection" class="text-center py-8">
+            <button id="startCallBtn" class="bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-lg text-lg font-bold transition-all transform hover:scale-105">
+                <i class="fas fa-phone ml-2"></i>
+                ورود به اتاق ایران
+            </button>
+            <p class="mt-4 text-gray-400 text-sm">
+                با کلیک روی دکمه بالا، مستقیماً به اتاق عمومی ایران متصل می‌شوید
+            </p>
+        </div>
+
+        <!-- محیط تماس -->
+        <div id="callSection" class="hidden">
+            <!-- گرید ویدیوها -->
+            <div id="videoGrid" class="video-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                <!-- ویدیو محلی -->
+                <div class="video-container" id="localVideoContainer">
+                    <video id="localVideo" class="video-element" autoplay muted playsinline></video>
+                    <div class="video-overlay">
+                        <span>شما</span>
+                        <span id="localStatus" class="mr-2"></span>
+                    </div>
+                    <button class="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white p-2 rounded hover:bg-opacity-70" onclick="toggleFullscreen('localVideo')">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- پنل کنترل -->
+            <div class="control-panel bg-gray-800 rounded-lg p-4 mb-6">
+                <div class="flex justify-center items-center gap-4 flex-wrap">
+                    <button id="toggleVideoBtn" class="control-button bg-gray-700 hover:bg-gray-600 text-white p-3 rounded-full">
+                        <i class="fas fa-video"></i>
+                    </button>
+                    <button id="toggleAudioBtn" class="control-button bg-gray-700 hover:bg-gray-600 text-white p-3 rounded-full">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button id="toggleScreenBtn" class="control-button bg-gray-700 hover:bg-gray-600 text-white p-3 rounded-full">
+                        <i class="fas fa-desktop"></i>
+                    </button>
+                    <button id="endCallBtn" class="control-button bg-red-600 hover:bg-red-700 text-white p-3 rounded-full">
+                        <i class="fas fa-phone-slash"></i>
+                    </button>
+                </div>
+                
+                <!-- اطلاعات کیفیت اتصال -->
+                <div class="mt-4 text-center text-sm text-gray-400">
+                    <span id="qualityInfo">کیفیت: در حال بررسی...</span>
+                    <span class="mx-2">|</span>
+                    <span id="bandwidthInfo">پهنای باند: محاسبه...</span>
+                </div>
+            </div>
+
+            <!-- چت متنی -->
+            <div class="bg-gray-800 rounded-lg p-4">
+                <h3 class="text-lg font-bold mb-3">
+                    <i class="fas fa-comments ml-2"></i>
+                    چت اتاق
+                </h3>
+                
+                <div id="chatMessages" class="chat-container bg-gray-900 rounded p-3 mb-3">
+                    <!-- پیام‌ها اینجا نمایش داده می‌شوند -->
+                </div>
+                
+                <div class="flex gap-2">
+                    <input 
+                        type="text" 
+                        id="chatInput" 
+                        placeholder="پیام خود را بنویسید..." 
+                        class="flex-1 bg-gray-700 text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        maxlength="200"
+                    >
+                    <button id="sendChatBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- فوتر -->
+    <footer class="bg-gray-800 p-4 mt-8 text-center text-gray-400 text-sm">
+        <p>اتاق ویدیویی ایران - کاملاً رایگان و بدون نیاز به نصب برنامه</p>
+        <p class="mt-1">بهینه شده برای اینترنت ضعیف و موبایل</p>
+    </footer>
+
+    <!-- Socket.IO Client -->
+    <script src="/socket.io/socket.io.js"></script>
+    
+    <!-- فایل جاوااسکریپت اصلی -->
+    <script src="app.js"></script>
+    
+    <!-- Service Worker برای PWA -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').then(registration => {
+                console.log('Service Worker ثبت شد:', registration);
+            }).catch(error => {
+                console.log('خطا در ثبت Service Worker:', error);
+            });
+        }
+    </script>
+</body>
+</html>
