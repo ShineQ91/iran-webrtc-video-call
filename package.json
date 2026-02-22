@@ -1,7 +1,7 @@
 {
   "name": "iran-webrtc-video-call",
   "version": "1.0.0",
-  "description": "Free WebRTC group video calling app optimized for low bandwidth - Iran room",
+  "description": "Free WebRTC group video calling app optimized for low bandwidth - Iran room - v1.0.1",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
