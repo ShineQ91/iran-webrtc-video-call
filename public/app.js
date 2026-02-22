@@ -12,12 +12,12 @@ class IranVideoCall {
         this.isAudioEnabled = true;
         this.isScreenSharing = false;
         
-        // تنظیمات بهینه برای اینترنت ضعیف - کیفیت بهبود یافته
+        // تنظیمات هوشمند برای همه سرعت‌ها - کیفیت تطبیقی
         this.mediaConstraints = {
             video: {
-                width: { ideal: 1280, max: 1920 },
-                height: { ideal: 720, max: 1080 },
-                frameRate: { ideal: 30, max: 60 }
+                width: { ideal: 640, max: 1920 },
+                height: { ideal: 480, max: 1080 },
+                frameRate: { ideal: 24, max: 60 }
             },
             audio: {
                 echoCancellation: true,
@@ -200,6 +200,9 @@ class IranVideoCall {
         try {
             this.updateConnectionStatus('connecting');
             
+            // تشخیص سرعت اینترنت قبل از درخواست میکروفون و دوربین
+            await this.detectNetworkSpeed();
+            
             // درخواست دسترسی به میکروفون و دوربین
             this.localStream = await navigator.mediaDevices.getUserMedia(this.mediaConstraints);
             
@@ -224,6 +227,58 @@ class IranVideoCall {
             console.error('خطا در شروع تماس:', error);
             this.showError('خطا در دسترسی به دوربین یا میکروفون');
         }
+    }
+    
+    // تشخیص سرعت اینترنت
+    async detectNetworkSpeed() {
+        try {
+            // تست ساده سرعت با دانلود یک فایل کوچک
+            const startTime = Date.now();
+            const response = await fetch('https://www.google.com/images/phd/px.gif', {
+                method: 'HEAD',
+                cache: 'no-cache'
+            });
+            const endTime = Date.now();
+            
+            const duration = (endTime - startTime) / 1000;
+            const speed = (1000 / duration) * 8; // bps
+            
+            console.log(`سرعت تشخیص داده شد: ${Math.round(speed / 1000)} kbps`);
+            
+            // تنظیم محدودیت‌ها بر اساس سرعت
+            this.adjustConstraintsBasedOnSpeed(speed);
+            
+        } catch (error) {
+            console.log('خطا در تشخیص سرعت:', error);
+            // استفاده از تنظیمات پیش‌فرض در صورت خطا
+        }
+    }
+    
+    // تنظیم محدودیت‌ها بر اساس سرعت اینترنت
+    adjustConstraintsBasedOnSpeed(speed) {
+        if (speed < 500000) { // کمتر از 500 kbps
+            // اینترنت بسیار ضعیف
+            this.mediaConstraints.video.width = { ideal: 320, max: 480 };
+            this.mediaConstraints.video.height = { ideal: 240, max: 360 };
+            this.mediaConstraints.video.frameRate = { ideal: 15, max: 20 };
+        } else if (speed < 1500000) { // کمتر از 1.5 Mbps
+            // اینترنت ضعیف
+            this.mediaConstraints.video.width = { ideal: 480, max: 640 };
+            this.mediaConstraints.video.height = { ideal: 360, max: 480 };
+            this.mediaConstraints.video.frameRate = { ideal: 20, max: 25 };
+        } else if (speed < 3000000) { // کمتر از 3 Mbps
+            // اینترنت متوسط
+            this.mediaConstraints.video.width = { ideal: 640, max: 960 };
+            this.mediaConstraints.video.height = { ideal: 480, max: 720 };
+            this.mediaConstraints.video.frameRate = { ideal: 24, max: 30 };
+        } else { // بالاتر از 3 Mbps
+            // اینترنت خوب
+            this.mediaConstraints.video.width = { ideal: 1280, max: 1920 };
+            this.mediaConstraints.video.height = { ideal: 720, max: 1080 };
+            this.mediaConstraints.video.frameRate = { ideal: 30, max: 60 };
+        }
+        
+        console.log('محدودیت‌های جدید:', this.mediaConstraints);
     }
     
     // ایجاد اتصال Peer
@@ -572,16 +627,16 @@ class IranVideoCall {
                 // به‌روزرسانی UI
                 this.updateQualityInfo(bitrate, packetsLost, rtt);
                 
-                // تنظیم تطبیقی کیفیت
-                this.adaptiveQuality(userId, bitrate, packetsLost);
+                // تنظیم تطبیقی کیفیت هوشمند
+                this.adaptiveQuality(userId, bitrate, packetsLost, rtt);
             }
         } catch (error) {
             console.error('خطا در مانیتورینگ کیفیت:', error);
         }
     }
     
-    // تنظیم تطبیقی کیفیت - بهبود یافته
-    adaptiveQuality(userId, bitrate, packetsLost) {
+    // تنظیم تطبیقی کیفیت - هوشمند برای همه سرعت‌ها
+    adaptiveQuality(userId, bitrate, packetsLost, rtt) {
         const pc = this.peerConnections[userId];
         if (!pc) return;
         
@@ -591,22 +646,63 @@ class IranVideoCall {
         const parameters = sender.getParameters();
         if (!parameters.encodings) return;
         
-        // اگر بیت‌ریت خیلی کم است یا پکت لاس زیاد است
-        if (bitrate < 500000 || packetsLost > 10) {
-            // کاهش کیفیت
-            parameters.encodings[0].scaleResolutionDownBy = 2;
-            parameters.encodings[0].maxBitrate = 500000;
-        } else if (bitrate > 1500000 && packetsLost < 3) {
-            // افزایش کیفیت
-            parameters.encodings[0].scaleResolutionDownBy = 1;
-            parameters.encodings[0].maxBitrate = 2500000;
-        } else {
-            // کیفیت متوسط
-            parameters.encodings[0].scaleResolutionDownBy = 1.5;
-            parameters.encodings[0].maxBitrate = 1500000;
+        // تشخیص کیفیت اتصال
+        const connectionQuality = this.assessConnectionQuality(bitrate, packetsLost, rtt);
+        
+        // تنظیم کیفیت بر اساس شرایط اتصال
+        switch (connectionQuality) {
+            case 'excellent':
+                parameters.encodings[0].scaleResolutionDownBy = 1;
+                parameters.encodings[0].maxBitrate = 3000000; // 3 Mbps
+                break;
+            case 'good':
+                parameters.encodings[0].scaleResolutionDownBy = 1;
+                parameters.encodings[0].maxBitrate = 2000000; // 2 Mbps
+                break;
+            case 'fair':
+                parameters.encodings[0].scaleResolutionDownBy = 1.5;
+                parameters.encodings[0].maxBitrate = 1000000; // 1 Mbps
+                break;
+            case 'poor':
+                parameters.encodings[0].scaleResolutionDownBy = 2;
+                parameters.encodings[0].maxBitrate = 500000; // 500 kbps
+                break;
+            case 'very_poor':
+                parameters.encodings[0].scaleResolutionDownBy = 4;
+                parameters.encodings[0].maxBitrate = 200000; // 200 kbps
+                break;
         }
         
         sender.setParameters(parameters).catch(console.error);
+    }
+    
+    // ارزیابی کیفیت اتصال
+    assessConnectionQuality(bitrate, packetsLost, rtt) {
+        // امتیازدهی به پارامترهای مختلف
+        let score = 0;
+        
+        // امتیاز بیت‌ریت (0-40)
+        if (bitrate > 3000000) score += 40;
+        else if (bitrate > 2000000) score += 30;
+        else if (bitrate > 1000000) score += 20;
+        else if (bitrate > 500000) score += 10;
+        
+        // امتیاز پکت لاس (منفی)
+        if (packetsLost > 10) score -= 20;
+        else if (packetsLost > 5) score -= 10;
+        else if (packetsLost > 2) score -= 5;
+        
+        // امتیاز تاخیر (منفی)
+        if (rtt > 500) score -= 20;
+        else if (rtt > 200) score -= 10;
+        else if (rtt > 100) score -= 5;
+        
+        // تعیین کیفیت نهایی
+        if (score >= 50) return 'excellent';
+        else if (score >= 30) return 'good';
+        else if (score >= 10) return 'fair';
+        else if (score >= 0) return 'poor';
+        else return 'very_poor';
     }
     
     // به‌روزرسانی اطلاعات کیفیت
