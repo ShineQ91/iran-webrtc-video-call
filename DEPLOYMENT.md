@@ -18,6 +18,54 @@ git commit -m "Initial commit - Iran Video Call"
 2. **آپلود به گیت‌هاب**
 ```bash
 git branch -M main
+git remote add origin https://github.com/YOUR_USERNAME/iran-webrtc-video-call.git
+git push -u origin main
+```
+
+**نکته مهم:** مطمئن شوید پوشه `public` در `.gitignore` نباشد تا فایل‌های فرانت‌اند آپلود شوند.
+
+### مرحله 2: تنظیم Render.com
+
+1. **ثبت‌نام در Render**
+- به [render.com](https://render.com) بروید
+- با GitHub ثبت‌نام کنید
+
+2. **ساخت Web Service جدید**
+- روی "New +" کلیک کنید
+- "Web Service" را انتخاب کنید
+- ریپازیتوری گیت‌هاب را متصل کنید
+
+3. **تنظیمات Build و Start**
+```yaml
+Name: iran-video-call
+Environment: Node
+Region: Europe West
+Branch: main
+Root Directory: (خالی بگذارید)
+Runtime: Node 18.x
+Build Command: npm install
+Start Command: npm start
+Instance Type: Free
+```
+
+4. **متغیرهای محیطی**
+```
+NODE_ENV=production
+```
+
+### مرحله 3: تست دیپلوی
+
+1. **بررسی لاگ‌ها**
+- در داشبورد Render، لاگ‌ها را بررسی کنید
+- اطمینان از اجرای موفقیت‌آمیز سرور
+
+2. **تست اتصال**
+- به آدرس داده شده بروید
+- تست تماس با چند کاربر همزمان
+
+**لینک پروژه نمونه:**
+- ریپازیتوری: https://github.com/ShineQ91/iran-webrtc-video-call
+- اپلیکیشن: https://iran-video-call.onrender.com
 git remote add origin https://github.com/your-username/iran-webrtc-video-call.git
 git push -u origin main
 ```
